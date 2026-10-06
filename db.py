@@ -14,33 +14,39 @@ CREATE TABLE IF NOT EXISTS runs (
     label       TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS results (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id            INTEGER NOT NULL REFERENCES runs(id),
-    case_id           TEXT NOT NULL,
-    category          TEXT NOT NULL,
-    prompt            TEXT NOT NULL,
-    response          TEXT NOT NULL,
-    retrieved_context TEXT NOT NULL,     -- stored as JSON text
-    poisoned_retrieved INTEGER NOT NULL, -- 0 or 1
-    leaked            INTEGER NOT NULL,  -- 0 or 1
-    latency_ms        INTEGER NOT NULL,
-    created_at        TEXT NOT NULL
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id             INTEGER NOT NULL REFERENCES runs(id),
+    case_id            TEXT NOT NULL,
+    category           TEXT NOT NULL,
+    prompt             TEXT NOT NULL,
+    response           TEXT NOT NULL,
+    retrieved_context  TEXT NOT NULL,      -- JSON text
+    poisoned_retrieved INTEGER NOT NULL,   -- 0 or 1
+    leaked             INTEGER NOT NULL,   -- secret code in reply: 0 or 1
+    pii_found          INTEGER NOT NULL,   -- Presidio found PII: 0 or 1
+    hallucination      REAL,               -- 0 to 1, higher is better; NULL if not judged
+    latency_ms         INTEGER NOT NULL,
+    created_at         TEXT NOT NULL
 );
 """
+
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
+
 def get_conn() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row   # lets us read columns by name
+    conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db() -> None:
     conn = get_conn()
-    conn.executescript(SCHEMA)       # IF NOT EXISTS makes this safe to repeat
+    conn.executescript(SCHEMA)
     conn.commit()
     conn.close()
+
 
 def create_run(config_id: str, model: str, label: str = "") -> int:
     conn = get_conn()
@@ -53,16 +59,17 @@ def create_run(config_id: str, model: str, label: str = "") -> int:
     conn.close()
     return run_id
 
-def log_result(run_id, case_id, category, prompt, response,
-               retrieved_context, poisoned_retrieved, leaked, latency_ms) -> None:
+
+def log_result(run_id, case_id, category, prompt, response, retrieved_context,
+               poisoned_retrieved, leaked, pii_found, hallucination, latency_ms) -> None:
     conn = get_conn()
     conn.execute(
         """INSERT INTO results
            (run_id, case_id, category, prompt, response, retrieved_context,
-            poisoned_retrieved, leaked, latency_ms, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (run_id, case_id, category, prompt, response,
-         json.dumps(retrieved_context), int(poisoned_retrieved), int(leaked),
+            poisoned_retrieved, leaked, pii_found, hallucination, latency_ms, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (run_id, case_id, category, prompt, response, json.dumps(retrieved_context),
+         int(poisoned_retrieved), int(leaked), int(pii_found), hallucination,
          latency_ms, _now()),
     )
     conn.commit()
