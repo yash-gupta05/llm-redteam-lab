@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, "mcp_server")
+
 import os
 os.environ["DEEPEVAL_TELEMETRY_OPT_OUT"] = "YES"   # don't send usage data
 
