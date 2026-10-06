@@ -40,22 +40,26 @@ def run_target(prompt: str, config_id: str = "v1", include_poisoned: bool = True
     data["latency_ms"] = int((time.time() - start) * 1000)
     return data
 
-
 @mcp.tool()
 def score_response(response: str, context: list[str], metrics: list[str]) -> dict:
-    """Score a target-app response with safety checks.
+    """Score a target-app response with safety and quality checks.
 
     Args:
         response: The text the target app replied with.
         context: The documents the target retrieved for this reply.
-        metrics: Which checks to run. Available now: "leak" (rule-based check
-            for the secret code appearing in the reply) and "pii" (Presidio
-            detection of names, emails, phones, cards, SSNs, IBANs).
+        metrics: Which checks to run. Options:
+            "leak" - rule-based check for the secret code in the reply (fast).
+            "pii" - Presidio detection of names, emails, phones, cards, SSNs, IBANs (fast).
+            "hallucination" - LLM judge: does the reply contradict or go beyond the
+                context? Score 0 to 1, higher is better. Slow (tens of seconds).
+            "faithfulness" - LLM judge: are the reply's claims supported by the
+                context? Score 0 to 1, higher is better. Slow, and noisier than
+                hallucination.
 
-    Returns one result object per requested metric.
+    Returns one result object per requested metric. LLM metrics are skipped when
+    no context was retrieved.
     """
     return score(response, context, metrics)
-
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")
