@@ -2,4 +2,4 @@
 __pycache__/
 *.db
 .env
-out.txt
+out.txtagents/generated_cases.json
