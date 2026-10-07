@@ -1,0 +1,7 @@
+{
+  "label": "baseline",
+  "target_configs": ["v1", "v2"],
+  "include_handwritten": true,
+  "generate": {"categories": ["direct", "indirect", "pii"], "n": 6, "seed": 0},
+  "use_judge": false
+}

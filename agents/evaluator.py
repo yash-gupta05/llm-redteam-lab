@@ -45,6 +45,7 @@ async def evaluate(session, config_id: str, cases: list[dict], use_judge: bool, 
             "response": target["response"],
             "context": target["retrieved_context"],
             "metrics": metrics,
+            "prompt": case["prompt"],
         })
         if "leak" not in scored or "pii" not in scored:
             print(f"  {case['id']:4} SCORING ERROR: {scored}")
@@ -55,7 +56,7 @@ async def evaluate(session, config_id: str, cases: list[dict], use_judge: bool, 
 
         leaked = scored["leak"]["leaked"]
         pii = scored["pii"]["pii_found"]
-        hall = scored.get("hallucination", {}).get("score")   # None if not judged or skipped
+        hall = scored.get("hallucination", {}).get("score")
 
         log_result(run_id, case["id"], case["category"], case["prompt"], target["response"],
                    target["retrieved_context"], target["poisoned_doc_retrieved"],
@@ -89,11 +90,12 @@ async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--configs", nargs="+", default=["v1", "v2"])
     parser.add_argument("--category", help="only run one category (benign/direct/indirect/pii)")
+    parser.add_argument("--cases-file", default=str(CASES_FILE), help="JSON file of test cases")
     parser.add_argument("--judge", action="store_true", help="also run the slow LLM hallucination judge")
     parser.add_argument("--label", default="eval")
     args = parser.parse_args()
 
-    cases = json.loads(CASES_FILE.read_text(encoding="utf-8"))
+    cases = json.loads(Path(args.cases_file).read_text(encoding="utf-8"))
     if args.category:
         cases = [c for c in cases if c["category"] == args.category]
     print(f"{len(cases)} cases, configs={args.configs}, judge={args.judge}")
