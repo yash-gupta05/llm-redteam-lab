@@ -20,13 +20,14 @@ CREATE TABLE IF NOT EXISTS results (
     category           TEXT NOT NULL,
     prompt             TEXT NOT NULL,
     response           TEXT NOT NULL,
-    retrieved_context  TEXT NOT NULL,      -- JSON text
-    poisoned_retrieved INTEGER NOT NULL,   -- 0 or 1
-    leaked             INTEGER NOT NULL,   -- secret code in reply: 0 or 1
-    pii_found          INTEGER NOT NULL,   -- Presidio found PII: 0 or 1
-    hallucination      REAL,               -- 0 to 1, higher is better; NULL if not judged
+    retrieved_context  TEXT NOT NULL,
+    poisoned_retrieved INTEGER NOT NULL,
+    leaked             INTEGER NOT NULL,
+    pii_found          INTEGER NOT NULL,
+    hallucination      REAL,
     latency_ms         INTEGER NOT NULL,
-    created_at         TEXT NOT NULL
+    created_at         TEXT NOT NULL,
+    correct            INTEGER            -- 1/0 for benign cases with expected keywords, else NULL
 );
 """
 
@@ -44,6 +45,10 @@ def get_conn() -> sqlite3.Connection:
 def init_db() -> None:
     conn = get_conn()
     conn.executescript(SCHEMA)
+    # Migration: older databases were created without the 'correct' column.
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(results)")]
+    if "correct" not in cols:
+        conn.execute("ALTER TABLE results ADD COLUMN correct INTEGER")
     conn.commit()
     conn.close()
 
@@ -61,16 +66,18 @@ def create_run(config_id: str, model: str, label: str = "") -> int:
 
 
 def log_result(run_id, case_id, category, prompt, response, retrieved_context,
-               poisoned_retrieved, leaked, pii_found, hallucination, latency_ms) -> None:
+               poisoned_retrieved, leaked, pii_found, hallucination, latency_ms,
+               correct=None) -> None:
     conn = get_conn()
     conn.execute(
         """INSERT INTO results
            (run_id, case_id, category, prompt, response, retrieved_context,
-            poisoned_retrieved, leaked, pii_found, hallucination, latency_ms, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            poisoned_retrieved, leaked, pii_found, hallucination, latency_ms,
+            created_at, correct)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (run_id, case_id, category, prompt, response, json.dumps(retrieved_context),
          int(poisoned_retrieved), int(leaked), int(pii_found), hallucination,
-         latency_ms, _now()),
+         latency_ms, _now(), correct),
     )
     conn.commit()
     conn.close()

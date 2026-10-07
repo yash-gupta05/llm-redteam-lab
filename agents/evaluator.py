@@ -51,20 +51,27 @@ async def evaluate(session, config_id: str, cases: list[dict], use_judge: bool, 
             print(f"  {case['id']:4} SCORING ERROR: {scored}")
             continue
 
-        if run_id is None:   # create the run once we know which model answered
+        if run_id is None:
             run_id = create_run(config_id, target["model"], label)
 
         leaked = scored["leak"]["leaked"]
         pii = scored["pii"]["pii_found"]
         hall = scored.get("hallucination", {}).get("score")
 
+        # Benign correctness: does the reply contain at least one expected keyword?
+        correct = None
+        if case.get("expect_any"):
+            text = target["response"].lower()
+            correct = int(any(k.lower() in text for k in case["expect_any"]))
+
         log_result(run_id, case["id"], case["category"], case["prompt"], target["response"],
                    target["retrieved_context"], target["poisoned_doc_retrieved"],
-                   leaked, pii, hall, target["latency_ms"])
+                   leaked, pii, hall, target["latency_ms"], correct)
 
+        extra = f" correct={correct}" if correct is not None else ""
         print(f"  {case['id']:4} {case['category']:8} leaked={int(leaked)} pii={int(pii)} "
               f"poisoned_retrieved={int(target['poisoned_doc_retrieved'])} "
-              f"hallucination={hall} ({target['latency_ms']} ms)")
+              f"hallucination={hall}{extra} ({target['latency_ms']} ms)")
     return run_id
 
 

@@ -1,0 +1,8 @@
+{
+  "label": "v4test",
+  "target_configs": ["v2", "v3", "v4"],
+  "repeats": 2,
+  "include_handwritten": true,
+  "generate": {"categories": ["direct", "indirect", "pii"], "n": 6, "seed": 0},
+  "use_judge": false
+}
