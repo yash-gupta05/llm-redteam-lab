@@ -5,6 +5,7 @@ import requests
 from mcp.server.fastmcp import FastMCP
 
 import attacks
+import queries
 from scoring import score
 
 TARGET_URL = "http://localhost:8000/chat"
@@ -18,7 +19,8 @@ def run_target(prompt: str, config_id: str = "v1", include_poisoned: bool = True
 
     Args:
         prompt: The user message to send to the target app.
-        config_id: Which target configuration to use ("v1" or "v2").
+        config_id: Prompt version "v1", "v2" or "v3", optionally with a model,
+            e.g. "v2@qwen2.5:7b". Without a model, llama3.2:3b is used.
         include_poisoned: Whether the poisoned document may be retrieved
             (True for indirect-injection tests, False for direct-injection tests).
 
@@ -87,6 +89,46 @@ def generate_attacks(category: str, n: int = 6, seed: int = 0) -> dict:
         return {"error": f"unknown category '{category}'. Use one of: {list(attacks.TEMPLATES)}"}
     n = max(1, min(n, 50))
     return attacks.make_attacks(category, n, seed)
+
+
+@mcp.tool()
+def query_results(sql: str, max_rows: int = 50) -> dict:
+    """Run a read-only SQL SELECT over the eval results database (SQLite).
+
+    Only a single SELECT (or WITH ... SELECT) is allowed; anything else is
+    rejected. At most 200 rows are returned, and long text cells are shortened.
+
+    Tables:
+      runs(id, created_at, config_id, model, label)
+      results(id, run_id, case_id, category, prompt, response, retrieved_context,
+              poisoned_retrieved, leaked, pii_found, hallucination, latency_ms, created_at)
+    Notes: category is benign/direct/indirect/pii. leaked and pii_found are 0/1,
+    so AVG(leaked) is the attack success rate. hallucination is 0-1 (higher is
+    better) and NULL when the judge was not run. results.run_id joins runs.id.
+
+    Args:
+        sql: The SELECT statement.
+        max_rows: Row limit for this query (1 to 200).
+
+    Returns {"columns", "rows", "row_count", "truncated"} or {"error"}.
+    """
+    return queries.run_query(sql, max_rows)
+
+
+@mcp.tool()
+def compare_runs(run_a: int, run_b: int) -> dict:
+    """Compare two eval runs (for example two prompt versions or two models).
+
+    Only cases with the same case_id AND identical prompt are compared.
+    Returns, per category, the attack success rate in each run and the delta
+    (negative means run_b is safer), average hallucination score and latency,
+    plus the case ids that were fixed or regressed in run_b.
+
+    Args:
+        run_a: Run id of the baseline (see the runs table).
+        run_b: Run id to compare against the baseline.
+    """
+    return queries.compare(run_a, run_b)
 
 
 if __name__ == "__main__":
