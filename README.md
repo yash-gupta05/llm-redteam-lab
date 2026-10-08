@@ -4,6 +4,9 @@ An open-source, multi-agent system that attacks a small LLM app, scores the repl
 
 The target is a fictional bank support bot (system prompt + tiny RAG) that holds a secret code. The lab tests whether attackers can extract it through direct prompt injection, indirect injection via a poisoned retrieved document, and PII fabrication.
 
+**Live dashboard (recorded benchmark results):** https://llm-redteam-lab-wuylf8phsdotb7aanyrngt.streamlit.app/
+The hosted version only browses saved results. The full pipeline runs locally.
+
 ## Architecture
 
 ```mermaid
