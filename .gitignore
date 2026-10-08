@@ -3,3 +3,4 @@ __pycache__/
 *.db
 .env
 out.txtagents/generated_cases.json
+!data/snapshot.db*.bak
